@@ -7,6 +7,12 @@
  #include <sys/ioctl.h>
 #include <time.h>
 
+typedef struct {
+  int *array;
+  size_t used;
+  size_t size;
+} Array;
+
 int fbfd = 0;
 struct fb_var_screeninfo vinfo;
 struct fb_fix_screeninfo finfo;
@@ -14,6 +20,31 @@ long int screensize = 0;
 char *fbp = 0;
 int x = 0, y = 0;
 long int location = 0;
+Array block;
+
+
+
+void initArray(Array *a, size_t initialSize) {
+  a->array = (int *)malloc(initialSize * sizeof(int));
+  a->used = 0;
+  a->size = initialSize;
+}
+
+void insertArray(Array *a, int element) {
+  // a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
+  // Therefore a->used can go up to a->size 
+  if (a->used == a->size) {
+    a->size *= 2;
+    a->array = (int *)realloc(a->array, a->size * sizeof(int));
+  }
+  a->array[a->used++] = element;
+}
+
+void freeArray(Array *a) {
+  free(a->array);
+  a->array = NULL;
+  a->used = a->size = 0;
+}
 
 
 void init() {
@@ -52,6 +83,10 @@ void init() {
      }
      printf("The framebuffer device was mapped to memory successfully.\n");
 
+
+     //init block array
+     initArray(&block, 5);
+
 }
 
 
@@ -82,35 +117,21 @@ void clearScreen() {
 }
 
 
-void drawText(int xCoord , int yCoord) {
+
+void loadBlockToMemory(char * blockfile, Array * blockmem) {
     FILE * inputFile;
     int pix;
     char see;
     int stop = 0;
-    int xCanvas= xCoord;
-    int yCanvas = yCoord;
 
-    inputFile = fopen("k.txt","r");
-    
+    inputFile = fopen(blockfile,"r");
 
     while (!stop) {
         fscanf(inputFile, "%d", &pix);
-        location = (xCanvas+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (yCanvas+vinfo.yoffset) * finfo.line_length;
-         *(fbp + location) = pix;        //blue
-         *(fbp + location + 1) = pix;    //green
-         *(fbp + location + 2) = pix;    //red
-         *(fbp + location + 3) = 0;      //transparansi
-        //printf("%d ", pix);
-        xCanvas++;
-
-
+        insertArray(blockmem, pix);
         see = getc(inputFile);
-
          if (see == '\n') {
-            //printf("\n");
-            xCanvas = 0;
-            yCanvas++;
-
+            insertArray(&block, -1);
          }
          else if( see == EOF) {
             stop = 1;
@@ -120,26 +141,102 @@ void drawText(int xCoord , int yCoord) {
 }
 
 
+
+void drawBlock(Array * blockmem, int xCoord , int yCoord ){
+    int i;
+    int xCanvas = xCoord;
+    int yCanvas = yCoord;
+    int pix;
+    for (i =0 ; i < (*blockmem).used ; i++) {
+        pix = (*blockmem).array[i];
+        //printf("%d ", pix);
+        if ( pix == -1 ) {
+            xCanvas = xCoord;
+            yCanvas++;
+            //printf("\n");
+        }
+        else {
+            location = (xCanvas+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (yCanvas+vinfo.yoffset) * finfo.line_length;
+            *(fbp + location) = pix;        //blue
+            *(fbp + location + 1) = pix;    //green
+            *(fbp + location + 2) = pix;    //red
+            *(fbp + location + 3) = 0;      //transparansi
+        }
+        xCanvas++;
+    }
+
+}
+
+
+void drawText(int xCoord, int yCoord){
+    int i;
+    int xCanvas = xCoord;
+    int yCanvas = yCoord;
+    int pix;
+    for (i =0 ; i < block.used ; i++) {
+        pix = block.array[i];
+        //printf("%d ", pix);
+        if ( pix == -1 ) {
+            xCanvas = xCoord;
+            yCanvas++;
+            //printf("\n");
+        }
+        else {
+            location = (xCanvas+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (yCanvas+vinfo.yoffset) * finfo.line_length;
+            *(fbp + location) = pix;        //blue
+            *(fbp + location + 1) = pix;    //green
+            *(fbp + location + 2) = pix;    //red
+            *(fbp + location + 3) = 0;      //transparansi
+        }
+        xCanvas++;
+    }
+}
+
+void removeText(int xCoord, int yCoord){
+    int i;
+    int xCanvas = xCoord;
+    int yCanvas = yCoord;
+    int pix;
+    for (i =0 ; i < block.used ; i++) {
+        pix = block.array[i];
+        //printf("%d ", pix);
+        if ( pix == -1 ) {
+            xCanvas = xCoord;
+            yCanvas++;
+            //printf("\n");
+        }
+        else {
+            location = (xCanvas+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (yCanvas+vinfo.yoffset) * finfo.line_length;
+            *(fbp + location) = 255;        //blue
+            *(fbp + location + 1) = 255;    //green
+            *(fbp + location + 2) = 255;    //red
+            *(fbp + location + 3) = 0;      //transparansi
+        }
+        xCanvas++;
+    }
+
+
+}
+
+
  int main()
  {
      
      init();
      clearScreen();
-     int j;    
-     for (j = 0 ; j < 100 ; j++) {
-        drawText(j,0);
-        usleep(50000);
-        clearScreen();
-     }
+     loadBlockToMemory("k.txt",&block);   
 
+     int j = 0 ;
+     for ( j = 0 ; j < 300 ; j = j + 2) {
+        removeText(j,j);
+        //drawText(j,j);
+        drawBlock(&block , j , j);
+        usleep(50000);
+        
+     }
      
 
-
-
-
-
-    
-
+     
 
 
      munmap(fbp, screensize);
