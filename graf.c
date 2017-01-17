@@ -148,9 +148,12 @@ void initBlock(char * blockfile, Block * blockmem , int _x , int _y) {
     while (!stop) {
         fscanf(inputFile, "%d", &pix);
         insertArray(blockmem, pix);
+        //printf("%d ", pix);
         see = getc(inputFile);
-         if (see == '\n') {
+        //printf("isee : %d \n", see );
+         if (see == 13) {
             insertArray(blockmem, -1);
+            //printf("\n");
          }
          else if( see == EOF) {
             stop = 1;
@@ -244,12 +247,18 @@ void terminate() {
 int main()
 {
     Block block;
+    Block nama;
 
     initScreen();
     clearScreen();
-    initBlock("k.txt",&block, 350, 700);
+    initBlock("kelompok.txt",&block, 350, 700);
     drawBlock(&block);   
     moveUp(&block, 500); 
+
+    initBlock("nama.txt", &nama , 350,700);
+    drawBlock(&nama);   
+    moveUp(&nama, 350); 
+
     terminate();
 
     return 0;
