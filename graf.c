@@ -230,7 +230,7 @@ void moveUp(Block * blockmem, int px){
     for (j ; j > initPx - px ; j = j - 4){
         setCoordinate(blockmem , blockmem->x , j);
         drawBlock(blockmem);
-        usleep(40000);
+        usleep(5000);
         removeBlock(blockmem);
     }
     drawBlock(blockmem);
@@ -251,13 +251,16 @@ int main()
 
     initScreen();
     clearScreen();
-    initBlock("kelompok.txt",&block, 350, 700);
+    initBlock("kelompok4.txt",&block, 400, 700);
     drawBlock(&block);   
     moveUp(&block, 500); 
+    //moveUp(&block, 800);
 
-    initBlock("nama.txt", &nama , 350,700);
-    drawBlock(&nama);   
-    moveUp(&nama, 350); 
+    initBlock("namakelompok.txt", &nama , 470,700);
+    drawBlock(&nama);
+    moveUp(&nama,380);   
+    //moveUp(&nama, 1000); 
+    
 
     terminate();
 
