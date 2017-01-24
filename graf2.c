@@ -19,7 +19,7 @@ int planeX1;
 int planeX2;
 
 int dir = 0;      //missile launcher direaction
-int pause = 0;
+int isPlaneCrashed = 0;
 
 void *movePlane(void *);
 
@@ -237,6 +237,11 @@ void moveUp(Block * blockmem, int px){
 }
 
 
+
+// ALGORITMA GARIS BRENSENHAM
+// --------------------------------------------------------------------------------------------------------- //
+
+
 void drawLinePositive(int x1, int y1, int x2, int y2, int clear){
     int dy = y2-y1;
     int dx = x2-x1;
@@ -342,6 +347,11 @@ void drawLine(int x1,int y1, int x2, int y2,int clear){
         drawLineNegative(x1,y1,x2,y2,clear);
     }
 }
+// --------------------------------------------------------------------------------------------------------- //
+
+
+
+
 
 void drawPlane(int xMove){
      //garis atas
@@ -391,18 +401,21 @@ void clearPlane(int xMove){
 void * movePlane(void * unused){
 	
 	int i = 0;
-	while(1) {
-		
 
-		
+	while(1 && !isPlaneCrashed) {
+	
 		for (i = 0 ; i <= 1366 ; i++){
-			
+			if (!isPlaneCrashed){
 			drawPlane(i);
 			usleep(5000);
 			clearPlane(i);
-		
-
-			
+		  }
+      else {
+        i += 1366;
+        Block block;
+        initBlock("boom.txt",&block, planeX1, planeY);
+        drawBlock(&block);  
+      }		
 		}
 	}
   
@@ -411,7 +424,7 @@ void * movePlane(void * unused){
 
 
 void drawMissileLauncher(){
-  while (1 && !pause) {
+  while (1) {
 
     drawLine(570,570,650,650,0);
     drawLine(571,570,651,650,0);
@@ -420,11 +433,10 @@ void drawMissileLauncher(){
     dir = 0;
     usleep(500000);
     drawLine(570,570,650,650,1);
-     drawLine(571,570,651,650,1);
+    drawLine(571,570,651,650,1);
     drawLine(572,570,652,650,1);
     drawLine(573,570,653,650,1);
    
-    while(pause){}
 
     drawLine(650,550,650,650,0);
     drawLine(651,550,651,650,0);
@@ -437,7 +449,7 @@ void drawMissileLauncher(){
     drawLine(652,550,652,650,1);
     drawLine(653,550,653,650,1);
 
-    while (pause) {}
+    
 
     drawLine(730,470,650,650,0);
     drawLine(731,470,651,650,0);
@@ -450,7 +462,7 @@ void drawMissileLauncher(){
     drawLine(732,470,652,650,1);
     drawLine(733,470,653,650,1);
     
-    while(pause){}
+   
 
     drawLine(650,550,650,650,0);
     drawLine(651,550,651,650,0);
@@ -497,18 +509,16 @@ int launchUpMissile(){
 	if ((xMissile > planeX1) && (xMissile < planeX2)){
           if ((yMissile < planeY)) {
             printf("dor");
+            isPlaneCrashed = 1;
             return 0;
           }
-        }
-	
-	
+        }	
   }
   return 0;
 }
 
 int launchRightMissile(){
-  int i = 0;
-    int dx = 0;
+    int i = 0;
     int dy = 0;
     int xMissile;
     int yMissile;
@@ -527,6 +537,7 @@ int launchRightMissile(){
         if ((xMissile > planeX1) && (xMissile < planeX2)){
           if ((yMissile < planeY)) {
             printf("dor");
+            isPlaneCrashed = 1;
             return 0;
           }
         }
@@ -543,8 +554,7 @@ int launchRightMissile(){
 
 
 int launchLeftMissile(){
-  int i = 0;
-    int dx = 0;
+    int i = 0;
     int dy = 0;
     int xMissile;
     int yMissile;
@@ -552,21 +562,26 @@ int launchLeftMissile(){
     for (i = 0 ; i < 570 ; i++ ){
         dy = dy + 1;
 
+        //draw Missile
         drawLine(570-i,570-dy,650-i,650-dy,2);
         drawLine(571-i,570-dy,651-i,650-dy,2);
         drawLine(572-i,570-dy,652-i,650-dy,2);
         drawLine(573-i,570-dy,653-i,650-dy,2);
+
+        //calculate Missile Coordinate
         xMissile = 530-i;
         yMissile= 570-dy;
 
+        //Check if already collision with the plane
         if ((xMissile > planeX1) && (xMissile < planeX2)){
           if ((yMissile < planeY)) {
-            printf("dor");
+            isPlaneCrashed = 1;
             return 0;
           }
         }
-
         usleep(5000);
+        
+        //clear Missile
         drawLine(570-i,570-dy,650-i,650-dy,1);
         drawLine(571-i,570-dy,651-i,650-dy,1);
         drawLine(572-i,570-dy,652-i,650-dy,1);
@@ -581,14 +596,8 @@ void * IOhandler(void * u) {
   while(1) {
     ch = getchar();
     if (ch == 10) {
-      pause  = 1;
       clearScreen();
-      
-      drawLine(550,650,750,650,0);
-      drawLine(550,651,750,651,0);
-      drawLine(550,652,750,652,0);
-      drawLine(550,653,750,653,0);
-      
+      drawMissileLauncherBase();      
       if (dir == 1) {
         launchUpMissile();
       }
@@ -598,15 +607,7 @@ void * IOhandler(void * u) {
       else {
         launchLeftMissile();
       }
-      pause = 0;
-    
-
-      /*
-      if(launchUpMissile()) {
-        perror("Pesawat tertembak\n");
-      }
-      */
-      
+          
     }
   }
 }
@@ -620,19 +621,19 @@ void terminate() {
 
 
 int main() {
-	
+	  pthread_t planeThread;
+    pthread_t IOthread;
+    
     initScreen();
     clearScreen();
- 
-    pthread_t planeThread;
-    pthread_t IOthread;
+
     pthread_create(&planeThread,NULL,movePlane,NULL);
     pthread_create(&IOthread,NULL,IOhandler,NULL);
 
     drawMissileLauncherBase();
     drawMissileLauncher();
     
-    while(1) {}
+    while(1 && isPlaneCrashed) {}
 
     terminate();
     return 0;
