@@ -8,22 +8,20 @@
 #include <time.h>
 #include <pthread.h>
 
-
-
-
 int fbfd = 0;                       //Filebuffer Filedescriptor
 struct fb_var_screeninfo vinfo;     //Struct Variable Screeninfo
 struct fb_fix_screeninfo finfo;     //Struct Fixed Screeninfo
 long int screensize = 0;            //Ukuran data framebuffer
 char *fbp = 0;                      //Framebuffer di memori internal
 
+int planeY;
+int planeX1;
+int planeX2;
+
+int dir = 0;      //missile launcher direaction
+int pause = 0;
 
 void *movePlane(void *);
-
-
-
-
-
 
 // STRUKTUR DATA BLOCK CHARACTER
 // --------------------------------------------------------------------------------------------------------- //
@@ -65,7 +63,17 @@ void setCoordinate(Block *a , int _x , int _y){
 
 // --------------------------------------------------------------------------------------------------------- //
 
-
+int isOverflow(int _x , int _y){
+//Cek apakah kooordinat (x,y) sudah melewati batas layar
+    int result;
+    if ( _x > vinfo.xres ||  _y > vinfo.yres -20 ) {
+        result = 1;
+    }
+    else {
+        result = 0;
+    }
+    return result;
+}
 
 void initScreen() {
 //Mapping framebuffer ke memori internal
@@ -105,23 +113,25 @@ void initScreen() {
 
 }
 
-
 void plotPixelRGBA(int _x , int _y , int r , int g , int b, int a) {
-//Plot pixel (x,y) dengan warna (r,g,b,a)
-    long int location = (_x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (_y+vinfo.yoffset) * finfo.line_length;
-    *(fbp + location) = b;        //blue
-    *(fbp + location + 1) = g;    //green
-    *(fbp + location + 2) = r;    //red
-    *(fbp + location + 3) = a;      //
+	//if(!isOverflow(_x,_y)) {
+		//Plot pixel (x,y) dengan warna (r,g,b,a)
+		long int location = (_x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (_y+vinfo.yoffset) * finfo.line_length;
+		*(fbp + location) = b;        //blue
+		*(fbp + location + 1) = g;    //green
+		*(fbp + location + 2) = r;    //red
+		*(fbp + location + 3) = a;      //
+	//}
 }
 
 void plotPixelRGB(int _x , int _y , int r , int g , int b) {
-//plot pixel (x,y) dengan warna (r,g,b)
-    long int location = (_x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (_y+vinfo.yoffset) * finfo.line_length;
-    unsigned short int t = r<<11 | g << 5 | b;
-    *((unsigned short int*)(fbp + location)) = t;
+	if(!isOverflow(_x,_y)) {
+		//plot pixel (x,y) dengan warna (r,g,b)
+		long int location = (_x+vinfo.xoffset) * (vinfo.bits_per_pixel/8) + (_y+vinfo.yoffset) * finfo.line_length;
+		unsigned short int t = r<<11 | g << 5 | b;
+		*((unsigned short int*)(fbp + location)) = t;
+	}
 }
-
 
 void clearScreen() {
 //Mewarnai latar belakang screen dengan warna putih
@@ -137,7 +147,6 @@ void clearScreen() {
 
          }
 }
-
 
 
 void initBlock(char * blockfile, Block * blockmem , int _x , int _y) {
@@ -169,20 +178,6 @@ void initBlock(char * blockfile, Block * blockmem , int _x , int _y) {
     }
 }
 
-int isOverflow(int _x , int _y){
-//Cek apakah kooordinat (x,y) sudah melewati batas layar
-    int result;
-    if ( _x > vinfo.xres ||  _y > vinfo.yres -20 ) {
-        result = 1;
-    }
-    else {
-        result = 0;
-    }
-    return result;
-}
-
-
-
 void drawBlock(Block * blockmem){
 //Menggambar block character pada layar
 
@@ -204,121 +199,6 @@ void drawBlock(Block * blockmem){
         xCanvas++;
     }
 }
-
-
-
-
-
-
-
-
-
-
-void drawLinePositive(int x1, int y1, int x2, int y2, int clear){
-    plotPixelRGBA(x1,y1,0,0,0,0);
-
-    int dy = y2-y1;
-    int dx = x2-x1;
-    int p = (dy + dy) - dx;
-    int x = x1;
-    int y = y1;
-
-    while ( x != x2) {
-        if (p < 0) {
-            p = p + dy + dy;
-            x++;
-        }
-        else if (p > 0){
-            p = p + dy + dy - dx - dx;
-            x++;
-            y++;
-        }
-        if (clear) {
-          plotPixelRGBA(x,y,255,255,255,0);
-        }
-        else {
-          plotPixelRGBA(x,y,0,0,0,0);
-        }
-    }
-}
-
-
-void drawLineNegative(int x1, int y1, int x2, int y2,int clear){
-    plotPixelRGBA(x1,y1,0,0,0,0);
-    int dy = y1-y2;
-    int dx = x2-x1;
-    int p = (dy + dy) - dx;
-    int x = x1;
-    int y = y1;
-    while ( x != x2) {
-        if (p < 0) {
-            p = p + dy + dy;
-            x++;
-        }
-        else if (p > 0){
-            p = p + dy + dy - dx - dx;
-            x++;
-            y--;
-        }
-        if (clear) {
-          plotPixelRGBA(x,y,255,255,255,0);
-        }
-        else {
-          plotPixelRGBA(x,y,0,0,0,0);
-        }
-    }
-}
-
-
-
-void drawHorizontalLine(int x1,int y1,int x2, int y2,int clear){
-    plotPixelRGBA(x1,y1,0,0,0,0);
-    int i;
-    for(i = x1 ; i <= x2; i++){
-        if (clear) {
-          plotPixelRGBA(i,y1,255,255,255,0);
-        }
-        else {
-          plotPixelRGBA(i,y1,0,0,0,0);
-        }
-    }
-}
-
-void drawVerticalLine(int x1,int y1,int x2, int y2,int clear){
-    plotPixelRGBA(x1,y1,0,0,0,0);
-    int i;
-    for(i = y1 ; i <= y2; i++){
-        if (clear) {
-          plotPixelRGBA(x1,i,255,255,255,0);
-        }
-        else {
-          plotPixelRGBA(x1,i,0,0,0,0);
-        }
-
-    }
-}
-
-
-//x harus naik, y boleh turun
-void drawLine(int x1,int y1, int x2, int y2,int clear){
-    if (x1 > x2) {
-        drawLine(x2,y2,x1,y1,clear);
-    }
-    else if (x1 == x2) {
-        drawVerticalLine(x1,y1,x2,y2,clear);
-    }
-    else if (y1 == y2){
-        drawHorizontalLine(x1,y1,x2,y2,clear);
-    }
-    else if ((x2 > x1) && (y2 > y1)) {
-        drawLinePositive(x1,y1,x2,y2,clear);
-    }
-    else if ((x2 > x1) && (y1 > y2)) {
-        drawLineNegative(x1,y1,x2,y2,clear);
-    }
-}
-
-
 
 void removeBlock(Block * blockmem){
 //Menghapus block character pada layar
@@ -342,7 +222,6 @@ void removeBlock(Block * blockmem){
     }
 }
 
-
 void moveUp(Block * blockmem, int px){
 //Animasi gerak ke atas sebesar x pixel
 
@@ -358,12 +237,111 @@ void moveUp(Block * blockmem, int px){
 }
 
 
-void terminate() {
-//Pengakhiran program.
-     munmap(fbp, screensize);
-     close(fbfd);
+void drawLinePositive(int x1, int y1, int x2, int y2, int clear){
+    int dy = y2-y1;
+    int dx = x2-x1;
+    int p = (dy + dy) - dx;
+    int x = x1;
+    int y = y1;
+
+    while ( x != x2) {
+        if (p < 0) {
+            p = p + dy + dy;
+            x++;
+        }
+        else if (p > 0){
+            p = p + dy + dy - dx - dx;
+            x++;
+            y++;
+        }
+        if (clear == 1) {
+          plotPixelRGBA(x,y,255,255,255,0);
+        }
+        else if (clear == 2) {
+          plotPixelRGBA(x,y,255,0,0,0);
+        }
+        else {
+          plotPixelRGBA(x,y,0,0,0,0);
+        }
+    }
+}
+void drawLineNegative(int x1, int y1, int x2, int y2,int clear){
+    int dy = y1-y2;
+    int dx = x2-x1;
+    int p = (dy + dy) - dx;
+    int x = x1;
+    int y = y1;
+    while ( x != x2) {
+        if (p < 0) {
+            p = p + dy + dy;
+            x++;
+        }
+        else if (p > 0){
+            p = p + dy + dy - dx - dx;
+            x++;
+            y--;
+        }
+        if (clear == 1) {
+          plotPixelRGBA(x,y,255,255,255,0);
+        }
+        else if (clear == 2) {
+          plotPixelRGBA(x,y,255,0,0,0);
+        }
+        else {
+          plotPixelRGBA(x,y,0,0,0,0);
+        }
+    }
+}
+void drawHorizontalLine(int x1,int y1,int x2, int y2,int clear){
+    //plotPixelRGBA(x1,y1,0,0,0,0);
+    int i;
+    for(i = x1 ; i <= x2; i++){
+        if (clear == 1) {
+          plotPixelRGBA(i,y1,255,255,255,0);
+        }
+        else if (clear == 2) {
+          plotPixelRGBA(i,y1,255,0,0,0);
+        }
+        else {
+          plotPixelRGBA(i,y1,0,0,0,0);
+        }
+    }
+}
+void drawVerticalLine(int x1,int y1,int x2, int y2,int clear){
+    plotPixelRGBA(x1,y1,0,0,0,0);
+    int i;
+    for(i = y1 ; i <= y2; i++){
+        if (clear == 1) {
+          plotPixelRGBA(x1,i,255,255,255,0);
+        }
+        else if (clear == 2) {
+          plotPixelRGBA(x1,i,255,0,0,0);
+        }
+        else {
+          plotPixelRGBA(x1,i,0,0,0,0);
+        }
+
+    }
 }
 
+//x harus naik, y boleh turun
+void drawLine(int x1,int y1, int x2, int y2,int clear){
+    if (x1 > x2) {
+        drawLine(x2,y2,x1,y1,clear);
+    }
+    else if (x1 == x2) {
+        drawVerticalLine(x1,y1,x2,y2,clear);
+    }
+    else if (y1 == y2){
+        drawHorizontalLine(x1,y1,x2,y2,clear);
+    }
+    else if ((x2 > x1) && (y2 > y1)) {
+        drawLinePositive(x1,y1,x2,y2,clear);
+    }
+    else if ((x2 > x1) && (y1 > y2)) {
+        drawLineNegative(x1,y1,x2,y2,clear);
+    }
+}
 
 void drawPlane(int xMove){
      //garis atas
@@ -371,6 +349,9 @@ void drawPlane(int xMove){
 
     //garis bawah
     drawLine(1054-xMove,95,1285-xMove,95,0);
+    planeY = 96;
+    planeX1 = 1054-xMove;
+    planeX2 = 1285-xMove;
 
     //garis atas
     drawLine(1285-xMove,25,1285-xMove,95,0);
@@ -387,7 +368,7 @@ void drawPlane(int xMove){
 }
 
 void clearPlane(int xMove){
-   //garis atas
+    //garis atas
     drawLine(1100-xMove,50,1250-xMove,50,1);
 
     //garis bawah
@@ -407,125 +388,253 @@ void clearPlane(int xMove){
     drawLine(1270-xMove,120,1180-xMove,80,1);
 }
 
-
 void * movePlane(void * unused){
-  int i = 0;
+	
+	int i = 0;
+	while(1) {
+		
 
-  while(1) {
+		
+		for (i = 0 ; i <= 1366 ; i++){
+			
+			drawPlane(i);
+			usleep(5000);
+			clearPlane(i);
+		
+
+			
+		}
+	}
   
-    
-  for (i = 0 ; i <= 1366 ; i++){
-    drawPlane(i);
-    usleep(5000);
-    clearPlane(i);
-  }
-  }
 }
 
-void * IOhandler(void * u){
-int ch;
 
-while(1) {
-    ch = getchar();
-    if (ch == 10) {
-      clearScreen();
-      drawLine(550,650,750,650,0);
-      drawLine(550,651,750,651,0);
-      drawLine(550,652,750,652,0);
-      drawLine(550,653,750,653,0);
-      launchUpMissile();
-    }
-}
-}
 
 void drawMissileLauncher(){
-  while (1) {
+  while (1 && !pause) {
 
     drawLine(570,570,650,650,0);
-    usleep(50000);
+    drawLine(571,570,651,650,0);
+    drawLine(572,570,652,650,0);
+    drawLine(573,570,653,650,0);
+    dir = 0;
+    usleep(500000);
     drawLine(570,570,650,650,1);
+     drawLine(571,570,651,650,1);
+    drawLine(572,570,652,650,1);
+    drawLine(573,570,653,650,1);
    
+    while(pause){}
 
     drawLine(650,550,650,650,0);
-    usleep(50000);
+    drawLine(651,550,651,650,0);
+    drawLine(652,550,652,650,0);
+    drawLine(653,550,653,650,0);
+    dir = 1;
+    usleep(500000);
     drawLine(650,550,650,650,1);
+    drawLine(651,550,651,650,1);
+    drawLine(652,550,652,650,1);
+    drawLine(653,550,653,650,1);
+
+    while (pause) {}
 
     drawLine(730,470,650,650,0);
-    usleep(50000);
+    drawLine(731,470,651,650,0);
+    drawLine(732,470,652,650,0);
+    drawLine(733,470,653,650,0);
+    dir = 2;
+    usleep(500000);
     drawLine(730,470,650,650,1);
-
+    drawLine(731,470,651,650,1);
+    drawLine(732,470,652,650,1);
+    drawLine(733,470,653,650,1);
     
+    while(pause){}
+
+    drawLine(650,550,650,650,0);
+    drawLine(651,550,651,650,0);
+    drawLine(652,550,652,650,0);
+    drawLine(653,550,653,650,0);
+    dir = 1;
+    usleep(500000);
+    drawLine(650,550,650,650,1);
+    drawLine(651,550,651,650,1);
+    drawLine(652,550,652,650,1);
+    drawLine(653,550,653,650,1);    
   }
 }
 
 
 void drawMissileLauncherBase(){
-  drawLine(550,650,750,650,0);
-  drawLine(550,651,750,651,0);
-  drawLine(550,652,750,652,0);
-  drawLine(550,653,750,653,0);
+  drawLine(575,650,725,650,0);
+  drawLine(575,651,725,651,0);
+  drawLine(575,652,725,652,0);
+  drawLine(575,653,725,653,0);
 }
 
 
 void drawUpMissile(int dy, int clear){
-  drawLine(648,550-dy,648,600-dy,clear);
-  drawLine(649,550-dy,649,600-dy,clear);
-  drawLine(650,550-dy,650,600-dy,clear);
-  drawLine(651,550-dy,651,600-dy,clear);
-  drawLine(652,550-dy,652,600-dy,clear);
+  drawLine(648,550-dy,648,650-dy,clear);
+  drawLine(649,550-dy,649,650-dy,clear);
+  drawLine(650,550-dy,650,650-dy,clear);
+  drawLine(651,550-dy,651,650-dy,clear);
+  drawLine(652,550-dy,652,650-dy,clear);
+}
+
+int launchUpMissile(){
+  int i = 0;
+  int xMissile;
+  int yMissile;
+  for ( i= 0 ; i < 500 ; i++) {
+	  
+    drawUpMissile(i,2);
+    xMissile = 648;
+    yMissile = 550 -i;
+    usleep(5000);
+    drawUpMissile(i,1);
+	
+	if ((xMissile > planeX1) && (xMissile < planeX2)){
+          if ((yMissile < planeY)) {
+            printf("dor");
+            return 0;
+          }
+        }
+	
+	
+  }
+  return 0;
+}
+
+int launchRightMissile(){
+  int i = 0;
+    int dx = 0;
+    int dy = 0;
+    int xMissile;
+    int yMissile;
+
+    for (i = 0 ; i < 570 ; i++ ){
+
+        dy = dy + 1;
+        drawLine(730+i,470-dy,650+i,650-dy,2);
+        drawLine(731+i,470-dy,651+i,650-dy,2);
+        drawLine(732+i,470-dy,652+i,650-dy,2);
+        drawLine(733+i,470-dy,653+i,650-dy,2);
+        drawLine(734+i,470-dy,654+i,650-dy,2);
+        xMissile = 730+i;
+        yMissile= 470-dy;
+
+        if ((xMissile > planeX1) && (xMissile < planeX2)){
+          if ((yMissile < planeY)) {
+            printf("dor");
+            return 0;
+          }
+        }
+
+        usleep(5000);
+        drawLine(730+i,470-dy,650+i,650-dy,1);
+        drawLine(731+i,470-dy,651+i,650-dy,1);
+        drawLine(732+i,470-dy,652+i,650-dy,1);
+        drawLine(733+i,470-dy,653+i,650-dy,1);
+        drawLine(734+i,470-dy,654+i,650-dy,1);
+    }
+    return 0;
 }
 
 
-
-void launchUpMissile(){
+int launchLeftMissile(){
   int i = 0;
-  for ( i= 0 ; i < 500 ; i++){
-    drawUpMissile(i,0);
-    usleep(5000);
-    drawUpMissile(i,1);
+    int dx = 0;
+    int dy = 0;
+    int xMissile;
+    int yMissile;
 
+    for (i = 0 ; i < 570 ; i++ ){
+        dy = dy + 1;
+
+        drawLine(570-i,570-dy,650-i,650-dy,2);
+        drawLine(571-i,570-dy,651-i,650-dy,2);
+        drawLine(572-i,570-dy,652-i,650-dy,2);
+        drawLine(573-i,570-dy,653-i,650-dy,2);
+        xMissile = 530-i;
+        yMissile= 570-dy;
+
+        if ((xMissile > planeX1) && (xMissile < planeX2)){
+          if ((yMissile < planeY)) {
+            printf("dor");
+            return 0;
+          }
+        }
+
+        usleep(5000);
+        drawLine(570-i,570-dy,650-i,650-dy,1);
+        drawLine(571-i,570-dy,651-i,650-dy,1);
+        drawLine(572-i,570-dy,652-i,650-dy,1);
+        drawLine(573-i,570-dy,653-i,650-dy,1);
+    }
+    return 0;
+}
+
+
+void * IOhandler(void * u) {
+  int ch;
+  while(1) {
+    ch = getchar();
+    if (ch == 10) {
+      pause  = 1;
+      clearScreen();
+      
+      drawLine(550,650,750,650,0);
+      drawLine(550,651,750,651,0);
+      drawLine(550,652,750,652,0);
+      drawLine(550,653,750,653,0);
+      
+      if (dir == 1) {
+        launchUpMissile();
+      }
+      else if (dir  == 2) {
+        launchRightMissile();
+      }
+      else {
+        launchLeftMissile();
+      }
+      pause = 0;
+    
+
+      /*
+      if(launchUpMissile()) {
+        perror("Pesawat tertembak\n");
+      }
+      */
+      
+    }
   }
 }
 
 
-int main()
-{
+void terminate() {
+	//Pengakhiran program.
+     munmap(fbp, screensize);
+     close(fbfd);
+}
+
+
+int main() {
+	
     initScreen();
     clearScreen();
  
-
-    drawLine(648,550,648,600,0);
-    drawLine(649,550,649,600,0);
-    drawLine(650,550,650,600,0);
-    drawLine(651,550,651,600,0);
-    drawLine(652,550,652,600,0);
-
-
-
-     
-
-    drawMissileLauncherBase();
-
-    
-
     pthread_t planeThread;
     pthread_t IOthread;
     pthread_create(&planeThread,NULL,movePlane,NULL);
     pthread_create(&IOthread,NULL,IOhandler,NULL);
 
-
+    drawMissileLauncherBase();
     drawMissileLauncher();
-
-
-    while(1){
-
-    }
-
-
- 
-
+    
+    while(1) {}
 
     terminate();
-
     return 0;
  }
+ 
